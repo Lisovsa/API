@@ -1,8 +1,14 @@
+import json
+
 from flask import Flask
 
-from parse_results import display
+from analyze import get_variants
+from parse_results import parse
 
 app = Flask(__name__)
+
+parsed_return = parse('RS_Via-3.xml')
+parsed_oneway = parse('RS_ViaOW.xml')
 
 
 @app.route('/', methods=['GET'])
@@ -12,32 +18,31 @@ def index():
 
 @app.route('/flights/oneway', methods=['GET'])
 def get_oneway():
-    return display('RS_ViaOW.xml')
+    return json.dumps(parsed_oneway)
 
 
 @app.route('/flights/return', methods=['GET'])
 def get_return():
-    return display('RS_Via-3.xml')
+    return json.dumps(parsed_return)
 
 
 @app.route('/variants/oneway', methods=['GET'])
 def oneway_variants():
-    functions_list = []
-    for function in functions_list:
-        return function()
+    return json.dumps(get_variants(parsed_oneway))
 
 
 @app.route('/variants/return', methods=['GET'])
 def return_variants():
-    functions_list = []
-    for function in functions_list:
-        return function()
+    return json.dumps(get_variants(parsed_return))
 
 
 @app.route('/difference/', methods=['GET'])
 def difference():
-    return 'Oneway itinireries fare is different for adult, child, infant. \
-            Return itineraries fare per person is fixed (is the same for a child and free for infant).'
+    return '"RS_ViaOW.xml" includes only oneway flights from DXB to BKK both direct and indirect with different ' \
+           'fares for an adult, a child, an infant on 2018-10-27. "RS_Via-3.xml" includes return option for dates: ' \
+           '2018-10-22 and 2018-10-30, route DXB - BKK, BKK - DXB. For all return itineraries fare per adult only is ' \
+           'given therefore we can assume that the fare is fixed (is the same for a child and free for an infant).' \
+           'So, overall difference: oneway - return, dates of flights, pricing terms.'
 
 
 if __name__ == '__main__':
