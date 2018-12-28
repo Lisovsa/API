@@ -5,8 +5,13 @@ from lxml import etree
 
 
 def parse(xml):
-    """Calls main parsing function, returns parsed results (list of quotes) in case of success,
-     prints out error message in case of error."""
+    """
+    Calls main parsing function.
+    Argument:
+        - XML filename in string format, ex. 'RS_ViaOW.xml'.
+    Returns parsed results (list of quotes) in case of success,
+    prints out error message in case of error.
+    """
 
     try:
         quotes = parse_file(xml)
@@ -18,8 +23,11 @@ def parse(xml):
 
 
 def parse_file(xml):
-    """Parses the XML file with flights.
-    Returns a list with quotes - flights results in dictionaries."""
+    """
+    Parses the XML file with flights.
+        - Argument: XML filename in string format, ex. 'RS_ViaOW.xml'.
+    Returns a list with quotes - flights results in dictionaries.
+    """
     with open(xml) as f:
         tree = etree.parse(f)
 
@@ -28,12 +36,12 @@ def parse_file(xml):
 
     for flight_data in root.findall('.//PricedItineraries/Flights'):
 
-        # Make clear whether we have one_way or return flight
+        # Make clear whether we have one_way or return flight.
         query_type = 'return'
         if not flight_data.xpath('.//ReturnPricedItinerary'):
             query_type = 'one_way'
 
-        # Create a quote: a valid result
+        # Create a quote: a valid result.
         quote = dict()
         quote['flight_type'] = query_type
 
@@ -41,10 +49,11 @@ def parse_file(xml):
         fares = get_fares(query_type, flight_data)
         quote['farebasis'] = fares
 
-        # Create segments - a list of all flights including stops
+        # Create segments - a list of all flights including stops.
         segments = list()
 
-        # A flight leg equals to 0 for outbound flights, to 1 for inbound flights, 2 and more for multidestination
+        # A flight leg is a flight from 'A' to 'B' that can have a stop in 'C'.
+        # A leg equals to 0 for outbound flights, to 1 for inbound flights, 2 and more for multidestination.
         for leg, flight in enumerate(flight_data):
             if flight.tag == 'Pricing':
                 break
@@ -60,7 +69,13 @@ def parse_file(xml):
 
 
 def get_fares(query_type, flight_data):
-    """Parses fares and fill fares list."""
+    """
+    Parses fares and fills fares list.
+    Arguments:
+        - query_type: 'one_way' or 'return';
+        - flight_data: XML Element 'Flights'.
+    Returns a list of fares with currency and fare_type.
+    """
 
     currency = {'currency': flight_data.xpath('.//Pricing/@currency')[0]}
     adult_fare = {
@@ -68,7 +83,7 @@ def get_fares(query_type, flight_data):
             './/Pricing/ServiceCharges[@type="SingleAdult"][@ChargeType="TotalAmount"]/text()')[0]
     }
 
-    # Return flights have fare for adult only, meaning a child fare equals adult fare and infant is free
+    # Return flights have fare for adult only, meaning a child fare equals adult fare and infant is free.
     child_fare = {
         'child': flight_data.xpath(
             './/Pricing/ServiceCharges[@type="SingleChild"][@ChargeType="TotalAmount"]/text()')[0]
@@ -80,12 +95,21 @@ def get_fares(query_type, flight_data):
         'infant': flight_data.xpath(
             './/Pricing/ServiceCharges[@type="SingleInfant"][@ChargeType="TotalAmount"]/text()')[0]
     } if query_type == 'one_way' else {'infant': 0}
+    fare_type = {
+        'fare_type': 'age_dependant'
+    } if query_type == 'one_way' else {'fare_type': 'fixed_fare'}
 
-    return [currency, adult_fare, child_fare, infant_fare]
+    return [currency, adult_fare, child_fare, infant_fare, fare_type]
 
 
 def make_segment(flight, leg):
-    """Creates flight segment dictionary."""
+    """
+    Creates flight segment dictionary. A 'leg' 'DXB - BKK' can have two segments: 'DXB - DEL', 'DEL - BKK'.
+    Arguments:
+        - flight: XML Element 'Flight';
+        - leg: int value: 0 for an outbound flight, 1 for inbound, 2 and more for multidestination.
+    Returns one flight segment as a dictionary.
+    """
     segment = dict()
     segment['carrier'] = flight.xpath('.//Carrier/text()')[0]
     segment['flight_number'] = flight.xpath('.//Carrier/@id')[0] + flight.xpath('.//FlightNumber/text()')[0]
@@ -101,7 +125,13 @@ def make_segment(flight, leg):
 
 
 def get_flight_length(segments, leg):
-    """Gets duration of each segment."""
+    """
+    Gets duration of each segment.
+    Arguments:
+        - segments: list of flight segments;
+        - leg: int value: 0 for an outbound flight, 1 for inbound, 2 and more for multidestination.
+    Returns duration of a leg (flight with stops) as a dictionary.
+    """
     segments = [x for x in segments if x['leg'] == leg]
     dep_date = datetime.strptime(segments[0]['departure_time'], '%Y-%m-%dT%H%M')
     arr_date = datetime.strptime(segments[-1]['arrival_time'], '%Y-%m-%dT%H%M')
@@ -110,7 +140,11 @@ def get_flight_length(segments, leg):
 
 
 def convert_timedelta(duration):
-    """Converts timedelta to hours and minutes for serialization means."""
+    """
+    Converts timedelta to a dictionary with hours and minutes for serialization means.
+    Argument:
+        - duration: timedelta object.
+    """
     days, seconds = duration.days, duration.seconds
     hours = days * 24 + seconds // 3600
     minutes = (seconds % 3600) // 60
